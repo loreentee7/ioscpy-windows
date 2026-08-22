@@ -15,9 +15,10 @@ impl InputFrame {
     }
 }
 
-/// Map a window-pixel mouse position to normalized [0, 1] device coordinates,
-/// accounting for the letterbox bars when the window and image aspect ratios
-/// differ. Clamps to the image edges.
+/// Map a window-pixel mouse position to normalized [0, 1] device coordinates.
+/// The frame is aspect-fit (letterboxed) and centered in the window, matching
+/// `scale_frame`, so we undo the centering offset and divide by the drawn size.
+/// Clicks that land in the black bars clamp to the nearest screen edge.
 pub fn map_to_norm(
     mx: f32,
     my: f32,
@@ -29,21 +30,12 @@ pub fn map_to_norm(
     if frame_w == 0 || frame_h == 0 || win_w == 0 || win_h == 0 {
         return (0.0, 0.0);
     }
-    let ww = win_w as f32;
-    let wh = win_h as f32;
-    let img_aspect = frame_w as f32 / frame_h as f32;
-    let win_aspect = ww / wh;
-
-    // size and position of the image area inside the window
-    let (img_w, img_h, x_off, y_off) = if win_aspect > img_aspect {
-        let w = wh * img_aspect;
-        (w, wh, (ww - w) / 2.0, 0.0)
-    } else {
-        let h = ww / img_aspect;
-        (ww, h, 0.0, (wh - h) / 2.0)
-    };
-
-    let nx = ((mx - x_off) / img_w).clamp(0.0, 1.0);
-    let ny = ((my - y_off) / img_h).clamp(0.0, 1.0);
+    let scale = (win_w as f32 / frame_w as f32).min(win_h as f32 / frame_h as f32);
+    let dw = frame_w as f32 * scale;
+    let dh = frame_h as f32 * scale;
+    let x_off = (win_w as f32 - dw) / 2.0;
+    let y_off = (win_h as f32 - dh) / 2.0;
+    let nx = ((mx - x_off) / dw).clamp(0.0, 1.0);
+    let ny = ((my - y_off) / dh).clamp(0.0, 1.0);
     (nx, ny)
 }

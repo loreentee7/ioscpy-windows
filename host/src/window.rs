@@ -420,6 +420,23 @@ pub fn set_app_icon() {
 #[cfg(not(target_os = "macos"))]
 pub fn set_app_icon() {}
 
+/// Make the process DPI-aware on Windows so the window and mirror render at true
+/// pixels instead of being bitmap-scaled up by the display's scale factor (which
+/// makes everything look zoomed and blurry). No-op elsewhere. Must run before any
+/// window is created.
+#[cfg(windows)]
+fn enable_dpi_awareness() {
+    #[link(name = "user32")]
+    extern "system" {
+        fn SetProcessDPIAware() -> i32;
+    }
+    unsafe {
+        SetProcessDPIAware();
+    }
+}
+#[cfg(not(windows))]
+fn enable_dpi_awareness() {}
+
 /// The window's backing scale (2.0 on retina). minifb reports its size in points
 /// but samples with nearest-neighbor, so to stay sharp we scale our buffer up to
 /// the real backing pixel resolution.
@@ -465,7 +482,24 @@ fn screen_visible_size() -> (f64, f64) {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn screen_visible_size() -> (f64, f64) {
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetSystemMetrics(n_index: i32) -> i32;
+    }
+    const SM_CXSCREEN: i32 = 0;
+    const SM_CYSCREEN: i32 = 1;
+    unsafe {
+        let (w, h) = (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+        if w > 0 && h > 0 {
+            (w as f64, h as f64)
+        } else {
+            (1440.0, 900.0)
+        }
+    }
+}
+#[cfg(not(any(target_os = "macos", windows)))]
 fn screen_visible_size() -> (f64, f64) {
     (1440.0, 900.0)
 }
@@ -482,6 +516,12 @@ fn scale_frame(src: &DecodedFrame, content_w: usize, out_h: usize, stride: usize
     let content_w = content_w.max(1);
     let out_h = out_h.max(1);
 
+    // Aspect-fit (letterbox) the device frame into the content area, centered,
+    // with black bars — scrcpy's default render-fit, so the image is never
+    // stretched/distorted. At the default window size the window already matches
+    // the device aspect, so there are no bars; they appear only if you resize to
+    // a different aspect, exactly like scrcpy. `map_to_norm` maps clicks against
+    // this same content rect so taps still land where the cursor is.
     let scale = (content_w as f32 / src.width as f32).min(out_h as f32 / src.height as f32);
     let dw = ((src.width as f32 * scale) as usize).clamp(1, content_w);
     let dh = ((src.height as f32 * scale) as usize).clamp(1, out_h);
@@ -545,6 +585,7 @@ pub fn run_window(
     input_tx: Sender<InputFrame>,
     clip_in: Receiver<String>,
 ) -> Result<()> {
+    enable_dpi_awareness();
     let first = match wait_for_first_frame(&frames, &stop) {
         Some(f) => f,
         None => return Ok(()), // stopped before the first frame arrived
@@ -557,7 +598,10 @@ pub fn run_window(
     let (sw, sh) = (sw as f32, sh as f32);
     let long = first.width.max(first.height).max(1) as f32;
     let short = first.width.min(first.height).max(1) as f32;
-    let display_scale = ((sh * 0.92) / long).min((sw * 0.92) / short);
+    // Cap at 1.0 so the window never opens larger than the device's native
+    // resolution — upscaling past native only softens the image (the phone has
+    // no more pixels), which reads as "pixelated" at big sizes.
+    let display_scale = ((sh * 0.80) / long).min((sw * 0.80) / short).min(1.0);
     // Size the first window exactly as a rotation to this shape would.
     let (win_w, win_h) = scaled_fit(first.width, first.height, display_scale, sidebar::WIDTH);
     let mut window = open_window(title, win_w, win_h)?;
@@ -596,7 +640,7 @@ pub fn run_window(
         let content_w = gw.saturating_sub(sidebar::WIDTH).max(1);
 
         let input_ctx = InputCtx { content_w, win_h: gh, tx: &input_tx, clip: &clip };
-        pump_input(&window, &current, &mut input, &input_ctx);
+        pump_input(&mut window, &current, &mut input, &input_ctx);
         #[cfg(not(target_os = "macos"))]
         pump_keys(&window, &input_tx, &clip);
 
@@ -612,7 +656,7 @@ pub fn run_window(
         let down = (2600.0 / (ow + sidebar::WIDTH as f32 * bs)).min(2600.0 / oh).min(1.0);
         let content_px = ((ow * down) as usize).max(1);
         let total_h = ((oh * down) as usize).max(1);
-        let sb_px = ((sidebar::WIDTH as f32 * bs * down).round() as usize).max(1);
+        let sb_px = (sidebar::WIDTH as f32 * bs * down).round() as usize;
         let stride = content_px + sb_px;
 
         combined.clear();
@@ -645,6 +689,12 @@ struct InputState {
     last: (f32, f32),
     /// Index of the sidebar button the press started on, while still held.
     sidebar_down: Option<usize>,
+    /// Previous-frame down-state of the mapped mouse buttons (right/middle/4th),
+    /// so each system action fires once on the press edge, not every frame it's
+    /// held. See the rising-edge check in `pump_input`.
+    prev_back: bool,
+    prev_home: bool,
+    prev_recents: bool,
 }
 
 /// Per-frame input collaborators, bundled so `pump_input` and its helpers
@@ -660,10 +710,52 @@ struct InputCtx<'a> {
     clip: &'a Arc<Mutex<ClipState>>,
 }
 
+/// Whether the given virtual-key is currently held, from the high bit of the
+/// Win32 async key state. `pump_input` tracks this frame-to-frame and fires on
+/// the rising edge, instead of reading the "pressed since last call" low bit —
+/// that bit is shared process-wide and gets consumed by any other program that
+/// polls GetAsyncKeyState, which made right-click intermittently miss. The high
+/// bit is a plain live-state read, so it's reliable. Mouse VKs: 0x02 = right,
+/// 0x04 = middle, 0x05 = X1 (4th / back-side button).
+#[cfg(windows)]
+fn vkey_down(vkey: i32) -> bool {
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetAsyncKeyState(v_key: i32) -> i16;
+    }
+    unsafe { (GetAsyncKeyState(vkey) as u16 & 0x8000) != 0 }
+}
+#[cfg(not(windows))]
+fn vkey_down(_vkey: i32) -> bool {
+    false
+}
+
 /// Turn this frame's mouse state into touch messages, or, for a press that
 /// starts in the sidebar strip, a button action. Keyboard shortcuts are
 /// handled separately by the event monitor.
-fn pump_input(window: &Window, frame: &DecodedFrame, state: &mut InputState, ctx: &InputCtx) {
+fn pump_input(window: &mut Window, frame: &DecodedFrame, state: &mut InputState, ctx: &InputCtx) {
+    // Mouse buttons mirror scrcpy: right = Back, middle = Home, 4th = App Switcher.
+    // Read each button's live down-state (VK_RBUTTON 0x02, VK_MBUTTON 0x04,
+    // VK_XBUTTON1 0x05) and fire once on the rising edge, so holding it doesn't
+    // repeat the action. Only act while our window has focus so clicks in other
+    // apps never reach the phone; still record the state every frame (even when
+    // unfocused) so a button pressed elsewhere doesn't fire when focus returns.
+    let (bd, hd, rd) = (vkey_down(0x02), vkey_down(0x04), vkey_down(0x05));
+    if window.is_active() {
+        if bd && !state.prev_back {
+            send_action(ctx.tx, SystemAction::Back);
+        }
+        if hd && !state.prev_home {
+            send_action(ctx.tx, SystemAction::Home);
+        }
+        if rd && !state.prev_recents {
+            send_action(ctx.tx, SystemAction::AppSwitcher);
+        }
+    }
+    state.prev_back = bd;
+    state.prev_home = hd;
+    state.prev_recents = rd;
+
     let down = window.get_mouse_down(MouseButton::Left);
 
     if !down {

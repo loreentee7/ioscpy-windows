@@ -13,7 +13,8 @@ use std::io::Cursor;
 use std::sync::OnceLock;
 
 /// Sidebar width in window points, before backing-scale.
-pub const WIDTH: usize = 56;
+/// Set to 0 to hide the sidebar entirely (full-screen mirror).
+pub const WIDTH: usize = 0;
 
 const ROWS: usize = 10;
 

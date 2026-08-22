@@ -5,17 +5,12 @@
 
 ## ⚡ Windows quick start (no building)
 
-1. **Apple Mobile Device Support** — install iTunes from **apple.com** (the Apple-website build, *not* the Microsoft Store one) or the standalone AMDS package. This installs the USB driver; iTunes must see your phone.
-2. **libimobiledevice tools** — with [Scoop](https://scoop.sh):
+1. **Install [iTunes for Windows](https://www.apple.com/itunes/download/win64)** — the build from **apple.com**, *not* the Microsoft Store one. This installs the USB driver; open it once so it sees your iPhone.
+2. **[Download the latest release](https://github.com/0xbartita/ioscpy-windows/releases/latest)**, extract it anywhere, and double-click **`run-ioscpy.cmd`**.
 
-   ```bat
-   scoop install libimobiledevice
-   ```
+That's the whole PC setup — the mirror and every device tool are inside the zip.
 
-   Confirm with `idevice_id -l` — it should print your device UDID.
-3. **Download & run** — grab `ioscpy-windows-<version>.zip` from [**Releases**](https://github.com/0xbartita/ioscpy-windows/releases), extract it anywhere, and double-click **`run-ioscpy.cmd`** (or run `ioscpy.exe --list` first to confirm the device is seen). The runtime DLLs ship inside the zip, so there is nothing else to install.
-
-Install the iPhone side once from the Sileo/Zebra repo (see [Install](#install)), and give the phone one physical tap after connecting — see [First touch](#first-touch).
+One-time iPhone side: install ioscpy from the [Sileo/Zebra repo](#install) and respring, then give the phone a single physical tap after connecting (see [First touch](#first-touch)).
 
 ### What this fork adds
 - **scrcpy-style mouse buttons:** right-click = **Back**, middle-click = **Home**, 4th button = **App Switcher**.

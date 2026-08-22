@@ -388,6 +388,44 @@ fn open_window(title: &str, w: usize, h: usize) -> Result<Window> {
     Ok(window)
 }
 
+/// minifb (on Windows especially) can hand back a client area whose aspect ratio
+/// differs from what we asked for, which would letterbox the device with black
+/// bars even at the default size. Snap the window down to the largest
+/// device-aspect rectangle that fits inside whatever size minifb actually gave,
+/// re-opening until the aspect matches (or we give up after a few tries). This
+/// makes the default window match the device's shape — scrcpy-style, so there are
+/// no bars unless the user later resizes to a different aspect.
+fn fit_window_to_aspect(mut window: Window, title: &str, frame_w: usize, frame_h: usize) -> Result<Window> {
+    if frame_w == 0 || frame_h == 0 {
+        return Ok(window);
+    }
+    let target = frame_w as f32 / frame_h as f32;
+    for _ in 0..3 {
+        let (gw, gh) = window.get_size();
+        if gw == 0 || gh == 0 {
+            break;
+        }
+        let cur = gw as f32 / gh as f32;
+        if (cur - target).abs() <= target * 0.01 {
+            break; // already device aspect within 1%
+        }
+        // Largest device-aspect rectangle that fits inside the current client box.
+        let (nw, nh) = if cur > target {
+            (((gh as f32 * target).round() as usize).max(160), gh) // too wide -> pin height
+        } else {
+            (gw, ((gw as f32 / target).round() as usize).max(160)) // too tall -> pin width
+        };
+        if (nw, nh) == (gw, gh) {
+            break;
+        }
+        let pos = window.get_position();
+        let mut w = open_window(title, nw, nh)?;
+        w.set_position(pos.0, pos.1);
+        window = w;
+    }
+    Ok(window)
+}
+
 /// Become a regular Dock app and set its icon (the icon is embedded in the
 /// binary). Call this before the window opens so the Dock shows our icon from the
 /// start instead of briefly flashing the default executable one. Main thread only.
@@ -506,22 +544,16 @@ fn screen_visible_size() -> (f64, f64) {
 
 /// Bilinearly scale `src` into the `[0, content_w)` columns of `dst`, a
 /// `stride`-wide by `out_h`-tall buffer that also holds the sidebar past
-/// `content_w`. Keeps the device aspect ratio and centers it with black bars
-/// (letterbox) within that column range; `dst` must already be cleared to the
-/// letterbox color. minifb's `AspectRatioStretch` can't do this letterboxing
-/// for us, as its POSIX scaler shears the image when the buffer is taller
-/// than the window (it swaps width/height into `image_resize_linear_stride`),
-/// so we letterbox ourselves and blit the result 1:1 with `Stretch`.
+/// `content_w`. Aspect-fit (letterbox) like scrcpy: the whole device screen is
+/// always visible, centered, with black bars on the off-aspect axis; `dst` must
+/// already be cleared to black. The window is snapped to the device aspect at
+/// open (`fit_window_to_aspect`), so the default has no bars — they appear only
+/// if you resize to a different shape, exactly like scrcpy. `map_to_norm` maps
+/// clicks against this same content rect so taps still land where the cursor is.
 fn scale_frame(src: &DecodedFrame, content_w: usize, out_h: usize, stride: usize, dst: &mut [u32]) {
     let content_w = content_w.max(1);
     let out_h = out_h.max(1);
 
-    // Aspect-fit (letterbox) the device frame into the content area, centered,
-    // with black bars — scrcpy's default render-fit, so the image is never
-    // stretched/distorted. At the default window size the window already matches
-    // the device aspect, so there are no bars; they appear only if you resize to
-    // a different aspect, exactly like scrcpy. `map_to_norm` maps clicks against
-    // this same content rect so taps still land where the cursor is.
     let scale = (content_w as f32 / src.width as f32).min(out_h as f32 / src.height as f32);
     let dw = ((src.width as f32 * scale) as usize).clamp(1, content_w);
     let dh = ((src.height as f32 * scale) as usize).clamp(1, out_h);
@@ -605,6 +637,9 @@ pub fn run_window(
     // Size the first window exactly as a rotation to this shape would.
     let (win_w, win_h) = scaled_fit(first.width, first.height, display_scale, sidebar::WIDTH);
     let mut window = open_window(title, win_w, win_h)?;
+    // Snap to the device aspect so the default has no black bars even if minifb
+    // handed back an off-aspect client area (scrcpy-style default fit).
+    window = fit_window_to_aspect(window, title, first.width, first.height)?;
     let clip = Arc::new(Mutex::new(ClipState::default()));
     install_key_monitor(input_tx.clone(), clip.clone());
     attach_text_input(&mut window, &input_tx);

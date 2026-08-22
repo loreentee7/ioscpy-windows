@@ -44,3 +44,6 @@ build*.log
 
 # Packaged Windows release zips (uploaded to GitHub Releases, not committed).
 ioscpy-windows-*.zip
+
+# Local window-sizing debug artifact (never commit).
+size-debug.log

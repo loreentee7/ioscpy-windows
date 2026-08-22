@@ -36,3 +36,11 @@ id_rsa*
 *.token
 secrets.env
 .env
+
+# Fork: unrelated reverse-engineering artifacts and build logs, never commit.
+kwai-*
+kwai-dump/
+build*.log
+
+# Packaged Windows release zips (uploaded to GitHub Releases, not committed).
+ioscpy-windows-*.zip

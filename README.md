@@ -1,4 +1,38 @@
-# ioscpy
+# ioscpy (Windows fork)
+
+> **Windows-focused fork of [lautarovculic/ioscpy](https://github.com/lautarovculic/ioscpy)**, maintained by [@0xbartita](https://github.com/0xbartita).
+> Upstream is excellent but has no Windows prebuilt — you have to build from source. This fork adds a **download-and-run Windows release** plus scrcpy-style controls and DPI-correct rendering, so Windows users can mirror a jailbroken iPhone without a toolchain. All credit for ioscpy goes to the original author, Lautaro Villarreal Culic'. MIT-licensed, same as upstream.
+
+## ⚡ Windows quick start (no building)
+
+1. **Apple Mobile Device Support** — install iTunes from **apple.com** (the Apple-website build, *not* the Microsoft Store one) or the standalone AMDS package. This installs the USB driver; iTunes must see your phone.
+2. **libimobiledevice tools** — with [Scoop](https://scoop.sh):
+
+   ```bat
+   scoop install libimobiledevice
+   ```
+
+   Confirm with `idevice_id -l` — it should print your device UDID.
+3. **Download & run** — grab `ioscpy-windows-<version>.zip` from [**Releases**](https://github.com/0xbartita/ioscpy-windows/releases), extract it anywhere, and double-click **`run-ioscpy.cmd`** (or run `ioscpy.exe --list` first to confirm the device is seen). The runtime DLLs ship inside the zip, so there is nothing else to install.
+
+Install the iPhone side once from the Sileo/Zebra repo (see [Install](#install)), and give the phone one physical tap after connecting — see [First touch](#first-touch).
+
+### What this fork adds
+- **scrcpy-style mouse buttons:** right-click = **Back**, middle-click = **Home**, 4th button = **App Switcher**.
+- **DPI-correct, sharp rendering** on high-scale Windows displays — no more zoomed or blurry mirror.
+- **Letterbox aspect-fit** so the image is never stretched when you resize the window.
+- Window opens at **native resolution** and is never upscaled past the device's real pixels.
+- **Sidebar hidden by default** for a full-screen mirror. To bring the button strip back, set `WIDTH` from `0` to `56` in [`host/src/sidebar.rs`](host/src/sidebar.rs) and rebuild.
+
+### Building this fork on Windows
+See the [Windows](#windows) section below for the toolchain. To produce the release zip yourself after building:
+
+```powershell
+cargo build --release --manifest-path host/Cargo.toml
+powershell -ExecutionPolicy Bypass -File scripts/make-windows-release.ps1 -Version 0.1.0
+```
+
+---
 
 ## ToDo
 - [ ] https://github.com/lautarovculic/ioscpy/issues/7

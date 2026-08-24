@@ -718,6 +718,44 @@ pub fn run_window(
     Ok(())
 }
 
+/// A synthetic left-edge "swipe to go back" gesture, emitted as timed touch steps
+/// across frames so the device's interactive-pop recognizer sees real motion.
+/// Fired alongside the Cmd+[ Back action so apps that ignore the key command still
+/// navigate back. Entirely host-side (reuses the normal touch path) — no device
+/// tweak change needed. Apps that honor both Cmd+[ and the swipe go back twice.
+struct BackSwipe {
+    start: Instant,
+    /// (delay-from-start, phase, x, y), in emit order: Down at the left edge, a
+    /// run of Moves rightward past the halfway point, then Up.
+    steps: Vec<(Duration, TouchPhase, f32, f32)>,
+    next: usize,
+}
+
+impl BackSwipe {
+    fn new() -> Self {
+        let (y, x0, x1, n) = (0.5f32, 0.02f32, 0.62f32, 10u64);
+        let mut steps = Vec::with_capacity(n as usize + 2);
+        steps.push((Duration::from_millis(0), TouchPhase::Down, x0, y));
+        for i in 1..=n {
+            let x = x0 + (x1 - x0) * (i as f32 / n as f32);
+            steps.push((Duration::from_millis(16 * i), TouchPhase::Move, x, y));
+        }
+        steps.push((Duration::from_millis(16 * (n + 1)), TouchPhase::Up, x1, y));
+        BackSwipe { start: Instant::now(), steps, next: 0 }
+    }
+
+    /// Emit every step now due; returns true once the whole gesture has been sent.
+    fn pump(&mut self, tx: &Sender<InputFrame>) -> bool {
+        let elapsed = self.start.elapsed();
+        while self.next < self.steps.len() && self.steps[self.next].0 <= elapsed {
+            let (_, phase, x, y) = self.steps[self.next];
+            send_touch(tx, phase, x, y);
+            self.next += 1;
+        }
+        self.next >= self.steps.len()
+    }
+}
+
 #[derive(Default)]
 struct InputState {
     touching: bool,
@@ -730,6 +768,8 @@ struct InputState {
     prev_back: bool,
     prev_home: bool,
     prev_recents: bool,
+    /// An in-flight right-click back-swipe, animating across frames.
+    back_swipe: Option<BackSwipe>,
 }
 
 /// Per-frame input collaborators, bundled so `pump_input` and its helpers
@@ -775,10 +815,22 @@ fn pump_input(window: &mut Window, frame: &DecodedFrame, state: &mut InputState,
     // repeat the action. Only act while our window has focus so clicks in other
     // apps never reach the phone; still record the state every frame (even when
     // unfocused) so a button pressed elsewhere doesn't fire when focus returns.
+    // Advance any in-flight synthetic back-swipe first, and clear it when done.
+    if let Some(sw) = state.back_swipe.as_mut() {
+        if sw.pump(ctx.tx) {
+            state.back_swipe = None;
+        }
+    }
+
     let (bd, hd, rd) = (vkey_down(0x02), vkey_down(0x04), vkey_down(0x05));
     if window.is_active() {
         if bd && !state.prev_back {
             send_action(ctx.tx, SystemAction::Back);
+            // Also drive the native left-edge swipe, for apps that ignore Cmd+[.
+            // Skip if a swipe is already playing or a finger is already down.
+            if state.back_swipe.is_none() && !state.touching {
+                state.back_swipe = Some(BackSwipe::new());
+            }
         }
         if hd && !state.prev_home {
             send_action(ctx.tx, SystemAction::Home);
@@ -790,6 +842,12 @@ fn pump_input(window: &mut Window, frame: &DecodedFrame, state: &mut InputState,
     state.prev_back = bd;
     state.prev_home = hd;
     state.prev_recents = rd;
+
+    // While the back-swipe animates, don't also drive touch from the mouse — both
+    // use finger 0 and would fight. Normal touch resumes once it finishes.
+    if state.back_swipe.is_some() {
+        return;
+    }
 
     let down = window.get_mouse_down(MouseButton::Left);
 

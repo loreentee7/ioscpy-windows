@@ -19,6 +19,9 @@ One-time iPhone side: install ioscpy from the [Sileo/Zebra repo](#install) and r
 - Window opens at **native resolution** and is never upscaled past the device's real pixels.
 - **Sidebar hidden by default** for a full-screen mirror. To bring the button strip back, set `WIDTH` from `0` to `56` in [`host/src/sidebar.rs`](host/src/sidebar.rs) and rebuild.
 
+  <img width="485" height="897" alt="image" src="https://github.com/user-attachments/assets/a44610d4-2b4f-47b2-b0bb-7e3c3a75d95c" />
+
+
 ### Building this fork on Windows
 See the [Windows](#windows) section below for the toolchain. To produce the release zip yourself after building:
 

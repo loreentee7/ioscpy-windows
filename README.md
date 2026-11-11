@@ -324,3 +324,15 @@ authenticate using your SSH password or key. Change any default SSH password.
 The daemon stays bound to iPhone loopback; the SSH tunnel carries the session.
 No device-side ioscpy changes are required. USB remains the default. Network
 firewalls and SSH server configuration can affect connectivity and latency.
+
+### Windows: interfaz para Wi-Fi
+
+Abre `ioscpy-wifi.cmd` para introducir la IP, el usuario SSH y la contraseña.
+Puedes guardar y eliminar perfiles, por ejemplo Casa y Oficina. La opción de
+guardar contraseña usa DPAPI de Windows vinculada al usuario de este PC; cada
+ordenador mantiene sus propios perfiles en `%LOCALAPPDATA%\ioscpy-wifi`.
+El ejecutable compilado debe estar en `host/target/release/ioscpy.exe` y Windows
+necesita el cliente OpenSSH. Mantén abierta la ventana de conexión durante la
+sesión. Al conectar por primera vez, verifica la huella SSH antes de aceptarla.
+El visor y el túnel pueden necesitar una conexión manual de nuevo si se pierde
+la red.

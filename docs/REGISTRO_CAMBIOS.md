@@ -31,3 +31,11 @@ Este documento recoge lo que solicita el propietario, los cambios realizados y s
 **Primera conexión comunicada como satisfactoria:** el propietario indicó que funcionó al ejecutar `--wifi mobile@<IP_DEL_IPHONE>` en su iPhone X con Dopamine. El intento con `root` había rechazado la autenticación. Pendiente confirmar expresamente imagen, controles y reconexión; no guardar la contraseña. Si cambia la IP, utilizar la dirección actual indicada en Ajustes > Wi-Fi.
 
 **Prueba funcional confirmada:** el propietario confirma que por Wi-Fi se ve la pantalla del iPhone y responden el ratón y el teclado. La reconexión después de una interrupción sigue pendiente de comprobar.
+
+## 11 de noviembre de 2026 — Interfaz gráfica Wi-Fi
+
+**Petición:** abrir una interfaz en Windows, introducir la IP y guardar perfiles y contraseñas para los ordenadores de casa y oficina.
+
+**Cambios realizados:** se creó `ioscpy-wifi.cmd`, que abre la interfaz WinForms de `scripts/wifi-gui.ps1`. Permite gestionar perfiles locales, introducir usuario e IP y conectar por SSH al visor. La contraseña se guarda solo si se selecciona la casilla, cifrada con DPAPI para el usuario de Windows; los perfiles se almacenan en `%LOCALAPPDATA%\ioscpy-wifi` y no se sincronizan entre ordenadores. La interfaz solicita confirmar la huella SSH al conectar por primera vez. Requiere OpenSSH y el ejecutable compilado en `host/target/release/ioscpy.exe`. El túnel y visor pueden requerir una nueva conexión tras interrumpirse la red.
+
+**Comprobaciones:** el script pasa el análisis de sintaxis de PowerShell; se compiló el asistente SSH y se comprobó que SSH ejecuta el mecanismo de contraseña usando una contraseña ficticia que fue rechazada. No se han verificado todavía la interacción visual completa, el guardado de perfiles ni una conexión real desde la nueva interfaz. La conexión Wi-Fi por línea de comandos sí fue confirmada previamente.

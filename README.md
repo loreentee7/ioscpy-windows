@@ -314,10 +314,11 @@ and iPhone to the same network. Find the iPhone's Wi-Fi IP address in iOS
 Settings, then run from a terminal:
 
 ```powershell
-ioscpy --wifi root@192.168.1.42
+ioscpy --wifi mobile@192.168.1.42
 ```
 
-Replace the example with the SSH user and actual IP address. Windows needs the
+Replace the example with the SSH user and actual IP address. On the tested
+Dopamine setup, the `mobile` account worked; the `root` login was refused. Windows needs the
 OpenSSH client (`ssh`) on PATH. Accept the host key only after verifying it, and
 authenticate using your SSH password or key. Change any default SSH password.
 The daemon stays bound to iPhone loopback; the SSH tunnel carries the session.

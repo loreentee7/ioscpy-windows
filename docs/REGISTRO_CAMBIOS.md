@@ -29,3 +29,5 @@ Este documento recoge lo que solicita el propietario, los cambios realizados y s
 **Diagnóstico posterior:** el iPhone cambió de dirección IP; las pruebas previas apuntaban a la dirección antigua, por lo que no acreditan un fallo de SSH. El usuario comprobó que `launchctl` muestra `com.openssh.sshd`; desde el PC se comprobó que el puerto 22 de la nueva dirección acepta conexiones TCP. Quedan pendientes la verificación de identidad y autenticación SSH y la prueba real de imagen y control. La dirección asignada por Wi-Fi puede volver a cambiar.
 
 **Primera conexión comunicada como satisfactoria:** el propietario indicó que funcionó al ejecutar `--wifi mobile@<IP_DEL_IPHONE>` en su iPhone X con Dopamine. El intento con `root` había rechazado la autenticación. Pendiente confirmar expresamente imagen, controles y reconexión; no guardar la contraseña. Si cambia la IP, utilizar la dirección actual indicada en Ajustes > Wi-Fi.
+
+**Prueba funcional confirmada:** el propietario confirma que por Wi-Fi se ve la pantalla del iPhone y responden el ratón y el teclado. La reconexión después de una interrupción sigue pendiente de comprobar.

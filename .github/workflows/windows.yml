@@ -1,0 +1,21 @@
+name: Windows build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test
+        run: cargo test --locked --manifest-path host/Cargo.toml
+      - name: Build
+        run: cargo build --release --locked --manifest-path host/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ioscpy-windows
+          path: host/target/release/ioscpy.exe

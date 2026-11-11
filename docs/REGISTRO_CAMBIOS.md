@@ -17,3 +17,9 @@ Este documento recoge lo que solicita el propietario, los cambios realizados y s
 **Petición:** documentar cada solicitud y actuación para dar contexto a la IA en ambos ordenadores, y subir a Git cada cambio, incluido este documento.
 
 **Cambios realizados:** creado este registro y `AGENTS.md` con las instrucciones para consultarlo y actualizarlo. El remoto de trabajo identificado es `origin` (`loreentee7/ioscpy-windows`); `upstream` corresponde al proyecto de origen.
+
+## 11 de noviembre de 2026 — Preparación de la prueba Wi-Fi
+
+**Información aportada:** el propietario confirma que OpenSSH está instalado en el iPhone. La dirección local se facilita durante la prueba; puede cambiar, por lo que no se fija en el código.
+
+**Actuación:** se añadió un flujo de GitHub Actions para ejecutar pruebas y compilar el ejecutable de Windows, ya que la instalación local de Visual Studio está incompleta. La primera comprobación TCP del puerto SSH no respondió desde este PC; instalación de OpenSSH no confirma que el servicio esté activo o que haya conectividad. Queda pendiente verificar la ejecución del flujo y realizar la prueba real con el iPhone.

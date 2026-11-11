@@ -516,6 +516,13 @@ fn establish(
         return TcpStream::connect(addr).with_context(|| format!("could not connect to {addr}"));
     }
 
+    if let Some(target) = &cli.wifi {
+        let forward = usbmux::UsbForward::start_wifi(target, port)?;
+        let stream = forward.connect()?;
+        *forward_slot = Some(forward);
+        return Ok(stream);
+    }
+
     let devices = device::list_devices()?;
     let dev = device::select_device(devices, cli.device.as_deref())?;
     info!(

@@ -18,6 +18,10 @@ pub struct Cli {
     #[arg(long, value_name = "UDID")]
     pub device: Option<String>,
 
+    /// Connect over Wi-Fi through SSH, for example root@192.168.1.42.
+    #[arg(long, value_name = "USER@HOST", conflicts_with = "addr")]
+    pub wifi: Option<String>,
+
     /// List attached compatible devices and exit.
     #[arg(long)]
     pub list: bool,

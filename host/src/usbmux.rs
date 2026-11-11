@@ -55,7 +55,10 @@ impl UsbForward {
             .stderr(Stdio::null())
             .spawn()
             .with_context(|| {
-                format!("couldn't start the USB link. {}", crate::platform::missing_tools_hint())
+                format!(
+                    "couldn't start the USB link. {}",
+                    crate::platform::missing_tools_hint()
+                )
             })?;
 
         let deadline = Instant::now() + Duration::from_secs(6);
@@ -73,6 +76,42 @@ impl UsbForward {
             sleep(Duration::from_millis(80));
         }
 
+        Ok(Self {
+            child,
+            local_port,
+            device_port,
+        })
+    }
+
+    /// Create an authenticated SSH tunnel to the daemon's loopback port.
+    pub fn start_wifi(target: &str, device_port: u16) -> Result<Self> {
+        if target.starts_with('-') || target.chars().any(char::is_whitespace) {
+            bail!("invalid SSH destination; use USER@HOST, for example root@192.168.1.42");
+        }
+        let local_port = free_local_port()?;
+        let spec = format!("127.0.0.1:{local_port}:127.0.0.1:{device_port}");
+        eprintln!(
+            "Opening SSH tunnel to {target}; accept the host key and authenticate if prompted."
+        );
+        let mut child = Command::new("ssh")
+            .args(["-N", "-o", "ExitOnForwardFailure=yes", "-L", &spec, target])
+            .spawn()
+            .context("couldn't start SSH; install the OpenSSH client and ensure ssh is on PATH")?;
+        let deadline = Instant::now() + Duration::from_secs(120);
+        loop {
+            if let Ok(Some(status)) = child.try_wait() {
+                bail!("SSH exited ({status}). Check the address, SSH server and credentials on the iPhone.");
+            }
+            if TcpStream::connect(("127.0.0.1", local_port)).is_ok() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                bail!("SSH tunnel timed out. Check the iPhone address and authentication.");
+            }
+            sleep(Duration::from_millis(100));
+        }
         Ok(Self {
             child,
             local_port,

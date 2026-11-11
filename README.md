@@ -306,3 +306,20 @@ For Linux hosts, same external requirement as macOS: libimobiledevice tools (`ip
 
 It now runs on Windows too, reusing the standard iOS USB tools without replacing
 any driver. It is still **ONLY** jailbroken iPhones.
+
+## Wi-Fi connection (SSH tunnel)
+
+On a jailbroken iPhone with an SSH server installed and running, connect the PC
+and iPhone to the same network. Find the iPhone's Wi-Fi IP address in iOS
+Settings, then run from a terminal:
+
+```powershell
+ioscpy --wifi root@192.168.1.42
+```
+
+Replace the example with the SSH user and actual IP address. Windows needs the
+OpenSSH client (`ssh`) on PATH. Accept the host key only after verifying it, and
+authenticate using your SSH password or key. Change any default SSH password.
+The daemon stays bound to iPhone loopback; the SSH tunnel carries the session.
+No device-side ioscpy changes are required. USB remains the default. Network
+firewalls and SSH server configuration can affect connectivity and latency.
